@@ -1,0 +1,44 @@
+name: AI Radar briefing
+
+on:
+  schedule:
+    # Every weekday at 05:00 UTC = 07:00 Amsterdam (summer) / 06:00 (winter)
+    - cron: "0 5 * * 1-5"
+  workflow_dispatch:   # lets you start a run manually from the Actions tab
+
+permissions:
+  contents: write      # needed to commit the briefing back into the repo
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Generate briefing
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          OPENAI_MODEL: gpt-4o-mini
+          RADAR_CACHE: "0"
+        run: |
+          mkdir -p briefings
+          python graph.py -o "briefings/$(date +%F)-briefing.md" -a "briefings/$(date +%F)-artikel.md"
+          cp "briefings/$(date +%F)-artikel.md" briefings/latest-artikel.md
+
+      - name: Commit briefing
+        run: |
+          git config user.name "ai-radar-bot"
+          git config user.email "ai-radar-bot@users.noreply.github.com"
+          git add briefings/
+          git commit -m "Briefing $(date +%F)" || echo "Nothing to commit"
+          git push
