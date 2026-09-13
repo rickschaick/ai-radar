@@ -21,8 +21,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -38,17 +36,24 @@ jobs:
           OPENAI_MODEL: gpt-4o-mini
           RADAR_CACHE: "0"
         run: |
-          mkdir -p briefings
-          python graph.py -o "briefings/$(date +%F)-briefing.md" -a "briefings/$(date +%F)-artikel.md"
-          cp "briefings/$(date +%F)-artikel.md" briefings/latest-artikel.md
+          # Write to a temp folder first so the repo stays untouched until we
+          # have synced with the latest main branch.
+          OUT="$RUNNER_TEMP/out"
+          mkdir -p "$OUT"
+          DAY=$(date +%F)
+          python graph.py -o "$OUT/$DAY-briefing.md" -a "$OUT/$DAY-artikel.md"
+          cp "$OUT/$DAY-artikel.md" "$OUT/latest-artikel.md"
 
       - name: Commit briefing
         run: |
           git config user.name "ai-radar-bot"
           git config user.email "ai-radar-bot@users.noreply.github.com"
+          # Sync to the newest main (another run may have pushed meanwhile),
+          # then drop today's files in. Newest run always wins, no merge needed.
+          git fetch origin main
+          git reset --hard origin/main
+          mkdir -p briefings
+          cp "$RUNNER_TEMP"/out/* briefings/
           git add briefings/
           git commit -m "Briefing $(date +%F)" || { echo "Nothing to commit"; exit 0; }
-          # If another run already pushed today, replay our commit on top and let
-          # our (newest) version win any conflict.
-          git pull --rebase -X theirs
-          git push
+          git push origin HEAD:main
