@@ -3,14 +3,16 @@ name: AI Radar briefing
 on:
   schedule:
     # Every weekday at 05:00 UTC = 07:00 Amsterdam (summer) / 06:00 (winter)
+    # For every day incl. weekend use: "0 5 * * *"
     - cron: "0 5 * * 1-5"
   workflow_dispatch:   # lets you start a run manually from the Actions tab
 
 permissions:
   contents: write      # needed to commit the briefing back into the repo
-   concurrency:
-     group: ai-radar-briefing
-     cancel-in-progress: false
+
+concurrency:
+  group: ai-radar-briefing
+  cancel-in-progress: false
 
 jobs:
   briefing:
@@ -19,7 +21,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-          with:
+        with:
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
@@ -46,5 +48,5 @@ jobs:
           git config user.email "ai-radar-bot@users.noreply.github.com"
           git add briefings/
           git commit -m "Briefing $(date +%F)" || echo "Nothing to commit"
-          git pull --rebase origin main
+          git pull --rebase
           git push
